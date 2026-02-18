@@ -1,0 +1,1099 @@
+{
+  "info": {
+    "_postman_id": "62f6222e-0260-40e2-a75c-5720040a2f82",
+    "name": "NTT DATA - Banking Microservices",
+    "description": "# NTT DATA Banking Microservices API\n\n## ✅ CONFIGURACIÓN ACTUALIZADA\n**El token JWT ahora expira en 5 MINUTOS** - ¡Perfecto para pruebas!\n- **Solución aplicada**: Corregido bug de conversión segundos→milisegundos\n- **Configuración**: `jwt.expiration=300` (5 minutos)\n\n## Arquitectura v1.0.0\n**Microservicios Independientes**\n- 🔐 **Auth Service**: Puerto 8080 - Autenticación JWT\n- 👥 **Customer Service**: Puerto 8081 - Gestión de clientes\n- 💰 **Account Service**: Puerto 8082 - Cuentas y movimientos\n\n## Autenticación JWT\n- **Expiración**: ✅ 5 minutos (300 segundos)\n- **Auto-guardado**: El token se guarda automáticamente en `{{authToken}}`\n- **Usuario funcionando**: `admin` / `1234`\n\n## Base de Datos\n- **MySQL**: Una instancia con dos esquemas\n  - `customerdb`: ba_personas, ba_clientes\n  - `accountdb`: ba_cuentas, ba_movimientos\n\n## Flujo Recomendado\n1. 🔑 **Login** → Token válido por 5 minutos\n2. 🚀 **Usar endpoints** libremente durante 5 minutos\n3. 🔄 **Renovar** si es necesario\n\n---\n**Versión**: 1.0.0 | **Proyecto**: NTT DATA | **Fecha**: 2026",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "23133124"
+  },
+  "item": [
+    {
+      "name": "🔐 Auth Service",
+      "item": [
+        {
+          "name": "Login (Obtener Token JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "console.log('🔍 Status Code:', pm.response.code);",
+                  "console.log('📄 Response Text:', pm.response.text());",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    try {",
+                  "        const response = pm.response.json();",
+                  "        console.log('📦 Parsed Response:', JSON.stringify(response, null, 2));",
+                  "        ",
+                  "        // El servidor devuelve accessToken, no token",
+                  "        if (response.accessToken) {",
+                  "            // Guardar token en variables globales Y environment (más compatible)",
+                  "            pm.globals.set('authToken', response.accessToken);",
+                  "            pm.environment.set('authToken', response.accessToken);",
+                  "            ",
+                  "            // Verificar que se guardó correctamente",
+                  "            const savedGlobal = pm.globals.get('authToken');",
+                  "            const savedEnv = pm.environment.get('authToken');",
+                  "            console.log('✅ Token guardado en Global:', savedGlobal ? 'SÍ' : 'NO');",
+                  "            console.log('✅ Token guardado en Environment:', savedEnv ? 'SÍ' : 'NO');",
+                  "            ",
+                  "            if (!savedEnv) {",
+                  "                console.log('⚠️ IMPORTANTE: Crea un Environment en Postman para mejor funcionamiento');",
+                  "                console.log('⚠️ O usa la variable Global que sí funciona');",
+                  "            }",
+                  "            ",
+                  "            console.log('✅ Token JWT guardado exitosamente');",
+                  "            console.log('🔑 Token (primeros 50 chars):', response.accessToken.substring(0, 50) + '...');",
+                  "            ",
+                  "            // Guardar información adicional del usuario",
+                  "            if (response.customerCode) {",
+                  "                pm.globals.set('currentCustomerCode', response.customerCode);",
+                  "                pm.environment.set('currentCustomerCode', response.customerCode);",
+                  "                console.log('👤 CustomerCode:', response.customerCode);",
+                  "            }",
+                  "            ",
+                  "            if (response.name) {",
+                  "                pm.globals.set('currentUserName', response.name);",
+                  "                pm.environment.set('currentUserName', response.name);",
+                  "                console.log('📝 Nombre:', response.name);",
+                  "            }",
+                  "            ",
+                  "            if (response.roles) {",
+                  "                pm.globals.set('userRoles', JSON.stringify(response.roles));",
+                  "                pm.environment.set('userRoles', JSON.stringify(response.roles));",
+                  "                console.log('🎭 Roles:', response.roles.join(', '));",
+                  "            }",
+                  "            ",
+                  "            // Calcular tiempo de expiración usando expiresIn del servidor",
+                  "            const expirationTime = new Date();",
+                  "            if (response.expiresIn) {",
+                  "                expirationTime.setSeconds(expirationTime.getSeconds() + response.expiresIn);",
+                  "                const minutes = Math.floor(response.expiresIn / 60);",
+                  "                const seconds = response.expiresIn % 60;",
+                  "                console.log('✅ Token expira en:', minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`);",
+                  "                console.log('⏰ Fecha de expiración:', expirationTime.toLocaleString());",
+                  "                ",
+                  "                if (response.expiresIn >= 300) {",
+                  "                    console.log('✅ PERFECTO: Tiempo suficiente para todas las pruebas');",
+                  "                } else if (response.expiresIn >= 60) {",
+                  "                    console.log('✅ BIEN: Tiempo adecuado para pruebas');",
+                  "                } else {",
+                  "                    console.log('🚨 WARNING: Token tiene expiración muy corta. Considerar aumentar en el servidor.');",
+                  "                    console.log('🚨 SOLUCIÓN: Cambiar jwt.expiration en application.yml del auth-service');",
+                  "                    console.log('🚨 Ejemplo: jwt.expiration=300 (5 minutos) o jwt.expiration=3600 (1 hora)');",
+                  "                }",
+                  "            } else {",
+                  "                // Fallback: 2 horas si no se especifica",
+                  "                expirationTime.setHours(expirationTime.getHours() + 2);",
+                  "                console.log('⏰ Token expira en: 2 horas (por defecto)');",
+                  "            }",
+                  "            ",
+                  "            pm.globals.set('tokenExpiration', expirationTime.toISOString());",
+                  "            pm.environment.set('tokenExpiration', expirationTime.toISOString());",
+                  "            ",
+                  "            pm.test('Login exitoso', function () {",
+                  "                pm.response.to.have.status(200);",
+                  "            });",
+                  "            ",
+                  "            pm.test('Token recibido', function () {",
+                  "                pm.expect(response.accessToken).to.be.a('string');",
+                  "                pm.expect(response.accessToken.length).to.be.greaterThan(0);",
+                  "            });",
+                  "            ",
+                  "            pm.test('Información de usuario completa', function () {",
+                  "                pm.expect(response.customerCode).to.be.a('string');",
+                  "                pm.expect(response.name).to.be.a('string');",
+                  "                pm.expect(response.roles).to.be.an('array');",
+                  "            });",
+                  "        } else {",
+                  "            console.log('❌ No se encontró el campo accessToken en la respuesta');",
+                  "            console.log('🔍 Campos disponibles:', Object.keys(response));",
+                  "        }",
+                  "    } catch (error) {",
+                  "        console.log('❌ Error parseando JSON:', error.message);",
+                  "    }",
+                  "} else {",
+                  "    console.log('❌ Error en login - Status:', pm.response.code);",
+                  "    console.log('❌ Respuesta:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{authServiceURL}}/auth/login",
+              "host": [
+                "{{authServiceURL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "## Login con JWT\n\n**✅ ACTUALIZADO**: El token ahora expira en **5 minutos** (300 segundos)\n\n### Usuarios de Prueba (confirmado funcionando)\n| Usuario | Password | Descripción |\n|---------|----------|-----------|\n| `admin` | `1234` | Usuario administrador ✅ FUNCIONANDO |\n\n### Respuesta Exitosa\n```json\n{\n  \"accessToken\": \"eyJhbGciOiJIUzI1NiJ9...\",\n  \"tokenType\": \"Bearer\",\n  \"expiresIn\": 300,\n  \"customerCode\": \"admin\",\n  \"name\": \"admin\",\n  \"roles\": [\"ROLE_ADMIN\"],\n  \"authorities\": [\"read:customers\", \"write:customers\", \"read:accounts\", \"write:accounts\", \"read:movements\", \"write:movements\", \"read:reports\"]\n}\n```\n\n### Auto-guardado\nEl token se guarda automáticamente en `{{authToken}}` y se usa en todas las peticiones autenticadas.\n\n**✅ PERFECTO**: Tiempo suficiente para hacer todas las pruebas necesarias."
+          },
+          "response": []
+        },
+        {
+          "name": "Validar Token JWT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "console.log('🔍 VALIDAR TOKEN - Respuesta recibida:');",
+                  "console.log('📊 Status Code:', pm.response.code);",
+                  "console.log('📄 Response Text:', pm.response.text());",
+                  "",
+                  "// Debuggear la petición que se envió",
+                  "console.log('📤 PETICIÓN ENVIADA:');",
+                  "console.log('📍 URL:', pm.request.url.toString());",
+                  "console.log('📍 Method:', pm.request.method);",
+                  "",
+                  "// Verificar headers de autorización enviados",
+                  "const authHeader = pm.request.headers.get('Authorization');",
+                  "if (authHeader) {",
+                  "    console.log('📍 Authorization Header enviado:', authHeader.substring(0, 60) + '...');",
+                  "    if (authHeader.startsWith('Bearer ')) {",
+                  "        console.log('✅ Header tiene formato Bearer correcto');",
+                  "        const tokenPart = authHeader.substring(7); // Remove 'Bearer '",
+                  "        if (tokenPart.split('.').length === 3) {",
+                  "            console.log('✅ Token en header tiene formato JWT válido');",
+                  "        } else {",
+                  "            console.log('❌ Token en header NO tiene formato JWT válido');",
+                  "        }",
+                  "    } else {",
+                  "        console.log('❌ Header Authorization NO tiene formato Bearer');",
+                  "    }",
+                  "} else {",
+                  "    console.log('❌ NO se envió header Authorization');",
+                  "}",
+                  "",
+                  "console.log('📋 Todos los headers enviados:', JSON.stringify(pm.request.headers.toObject(), null, 2));",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    try {",
+                  "        const response = pm.response.json();",
+                  "        console.log('✅ Token válido - Respuesta:', JSON.stringify(response, null, 2));",
+                  "        ",
+                  "        pm.test('Token válido', function () {",
+                  "            pm.response.to.have.status(200);",
+                  "        });",
+                  "    } catch (error) {",
+                  "        console.log('❌ Error parseando respuesta JSON:', error.message);",
+                  "    }",
+                  "} else if (pm.response.code === 400) {",
+                  "    console.log('❌ BAD REQUEST - Posibles causas:');",
+                  "    console.log('  1. Token mal formateado');",
+                  "    console.log('  2. Header Authorization incorrecto');",
+                  "    console.log('  3. Token vacío o nulo');",
+                  "    console.log('  4. Formato Bearer incorrecto');",
+                  "    console.log('  5. Variable {{authToken}} no se resolvió');",
+                  "    ",
+                  "    // Intentar mostrar detalles del error",
+                  "    try {",
+                  "        const errorResponse = pm.response.json();",
+                  "        console.log('📝 Detalles del error:', JSON.stringify(errorResponse, null, 2));",
+                  "    } catch (e) {",
+                  "        console.log('📝 Respuesta de error (texto):', pm.response.text());",
+                  "    }",
+                  "} else if (pm.response.code === 401) {",
+                  "    console.log('❌ Token inválido o expirado - Ejecuta Login nuevamente');",
+                  "} else {",
+                  "    console.log('❌ Error inesperado:', pm.response.code, pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{authServiceURL}}/auth/validate",
+              "host": [
+                "{{authServiceURL}}"
+              ],
+              "path": [
+                "auth",
+                "validate"
+              ]
+            },
+            "description": "## Validar Token JWT\n\nVerifica si el token actual es válido y retorna información del usuario autenticado.\n\n### Respuesta Exitosa\n```json\n{\n  \"username\": \"CLI001\",\n  \"valid\": true\n}\n```"
+          },
+          "response": []
+        }
+      ],
+      "description": "## 🔐 Autenticación JWT\n\nServicio centralizado de autenticación que genera y valida tokens JWT.\n\n### Características\n- ✅ Login con credenciales de cliente\n- ✅ Tokens JWT con expiración de 2 horas\n- ✅ Validación de tokens para otros servicios"
+    },
+    {
+      "name": "👥 Customer Service",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customerServiceURL}}/actuator/health",
+              "host": [
+                "{{customerServiceURL}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Health check del servicio de clientes."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Cliente",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"María González\",\n  \"gender\": \"Female\",\n  \"age\": 28,\n  \"identification\": \"1234567899\",\n  \"address\": \"Main Street 456, Quito\",\n  \"phone\": \"0991234572\",\n  \"customerCode\": \"CUST005\",\n  \"password\": \"1234\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{customerServiceURL}}/api/v1/customers",
+              "host": [
+                "{{customerServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            },
+            "description": "## Crear Cliente\n\nCrea un nuevo cliente en el sistema.\n\n### Campos Requeridos\n- `name`: Nombre completo\n- `gender`: Male/Female\n- `age`: Edad numérica\n- `identification`: Documento único\n- `address`: Dirección física\n- `phone`: Número de contacto\n- `customerCode`: Código único del cliente (ej: CUST004)\n- `password`: Contraseña para acceso\n- `active`: Estado activo/inactivo"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Todos los Clientes",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customerServiceURL}}/api/v1/customers",
+              "host": [
+                "{{customerServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            },
+            "description": "Obtiene la lista de todos los clientes activos."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Cliente por ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customerServiceURL}}/api/v1/customers/1",
+              "host": [
+                "{{customerServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "1"
+              ]
+            },
+            "description": "Obtiene un cliente específico por su ID interno."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Cliente por Código",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{customerServiceURL}}/api/v1/customers/code/CUST005",
+              "host": [
+                "{{customerServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "code",
+                "CUST005"
+              ]
+            },
+            "description": "Busca un cliente por su código único (customerCode)."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Cliente",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jose Lema Actualizado\",\n  \"gender\": \"Masculino\",\n  \"age\": 36,\n  \"identification\": \"1234567890\",\n  \"address\": \"New Address 123, Updated City\",\n  \"phone\": \"0982547851\",\n  \"customerCode\": \"CUST001\",\n  \"password\": \"1234\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{customerServiceURL}}/api/v1/customers/1",
+              "host": [
+                "{{customerServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "1"
+              ]
+            },
+            "description": "Actualiza los datos de un cliente existente."
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Cliente",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{customerServiceURL}}/api/v1/customers/1",
+              "host": [
+                "{{customerServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "1"
+              ]
+            },
+            "description": "Elimina un cliente del sistema (eliminación lógica)."
+          },
+          "response": []
+        }
+      ],
+      "description": "## 👥 Gestión de Clientes\n\nCRUD completo para la administración de clientes del sistema bancario.\n\n### Características\n- ✅ Crear, consultar, actualizar y eliminar clientes\n- ✅ Búsqueda por ID y código de cliente\n- ✅ Integración con sistema de autenticación JWT\n- ✅ Eventos Kafka para sincronización"
+    },
+    {
+      "name": "💰 Account Service - Cuentas",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/actuator/health",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Health check del servicio de cuentas."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Cuenta",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"2400012\",\n  \"accountType\": \"AHORRO\",\n  \"initialBalance\": 5000.00,\n  \"currentBalance\": 5000.00,\n  \"active\": true,\n  \"customerCode\": \"CUST001\"\n}"
+            },
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/accounts",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts"
+              ]
+            },
+            "description": "## Crear Cuenta Bancaria\n\nCrea una nueva cuenta asociada a un cliente.\n\n### Campos Requeridos\n- `accountNumber`: Número único de cuenta\n- `accountType`: SAVINGS o CHECKING\n- `initialBalance`: Saldo inicial\n- `currentBalance`: Saldo actual (igual al inicial)\n- `active`: Estado de la cuenta\n- `customerCode`: Código del cliente propietario"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Todas las Cuentas",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/accounts",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts"
+              ]
+            },
+            "description": "Obtiene la lista de todas las cuentas activas."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Cuenta por Número",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/accounts/8",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "8"
+              ]
+            },
+            "description": "Busca una cuenta por su número único."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Cuentas por Cliente",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/accounts/customer/CUST001",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "customer",
+                "CUST001"
+              ]
+            },
+            "description": "Obtiene todas las cuentas de un cliente específico."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Cuenta",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"478758\",\n  \"accountType\": \"CHECKING\",\n  \"initialBalance\": 2000.00,\n  \"currentBalance\": 1425.00,\n  \"active\": true,\n  \"customerCode\": \"CUST001\"\n}"
+            },
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/accounts/1",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "1"
+              ]
+            },
+            "description": "Actualiza los datos de una cuenta existente."
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Cuenta",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/accounts/1",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "1"
+              ]
+            },
+            "description": "Elimina una cuenta del sistema (eliminación lógica)."
+          },
+          "response": []
+        }
+      ],
+      "description": "## 💰 Gestión de Cuentas\n\nAdministración completa de cuentas bancarias.\n\n### Tipos de Cuenta\n- **SAVINGS**: Cuenta de ahorros\n- **CHECKING**: Cuenta corriente\n\n### Características\n- ✅ Crear, consultar, actualizar y eliminar cuentas\n- ✅ Asociación con clientes via customerCode\n- ✅ Control de saldos y estados"
+    },
+    {
+      "name": "📊 Account Service - Movimientos",
+      "item": [
+        {
+          "name": "Registrar Depósito",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"movementType\": \"DEPOSITO\",\n  \"amount\": 1000.00,\n  \"description\": \"Deposit via ATM\",\n  \"accountNumber\": \"2400001\"\n}"
+            },
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/movements",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ]
+            },
+            "description": "## Registrar Depósito\n\nRegistra un movimiento de crédito (depósito) en una cuenta.\n\n### Campos Requeridos\n- `movementType`: \"CREDIT\" para depósitos\n- `amount`: Monto a depositar (positivo)\n- `description`: Descripción del movimiento\n- `accountNumber`: Número de cuenta destino"
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Retiro",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"movementType\": \"RETIRO\",\n  \"amount\": 500.00,\n  \"description\": \"ATM withdrawal\",\n  \"accountNumber\": \"2400001\"\n}"
+            },
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/movements",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ]
+            },
+            "description": "## Registrar Retiro\n\nRegistra un movimiento de débito (retiro) en una cuenta.\n\n### Validaciones\n- Verifica saldo suficiente antes del retiro\n- Actualiza el saldo de la cuenta automáticamente\n\n### Campos Requeridos\n- `movementType`: \"DEBIT\" para retiros\n- `amount`: Monto a retirar (positivo, se convierte a negativo internamente)\n- `description`: Descripción del movimiento\n- `accountNumber`: Número de cuenta origen"
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Todos los Movimientos",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/movements",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements"
+              ]
+            },
+            "description": "Obtiene la lista de todos los movimientos del sistema."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Movimientos por Cuenta",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/movements/account/2400001",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "account",
+                "2400001"
+              ]
+            },
+            "description": "Obtiene todos los movimientos de una cuenta específica."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Movimientos por Cliente",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/movements/customer/CLI005",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "customer",
+                "CLI005"
+              ]
+            },
+            "description": "Obtiene todos los movimientos de todas las cuentas de un cliente."
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Movimiento",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/movements/1",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "movements",
+                "1"
+              ]
+            },
+            "description": "Elimina un movimiento del sistema. ⚠️ Esta operación puede afectar el saldo de la cuenta."
+          },
+          "response": []
+        }
+      ],
+      "description": "## 📊 Gestión de Movimientos\n\nRegistro y consulta de todas las transacciones bancarias.\n\n### Tipos de Movimiento\n- **CREDIT**: Depósitos, ingresos\n- **DEBIT**: Retiros, egresos\n\n### Características\n- ✅ Validación de saldo para retiros\n- ✅ Actualización automática de saldos\n- ✅ Historial completo de transacciones\n- ✅ Consultas por cuenta y cliente"
+    },
+    {
+      "name": "📈 Account Service - Reportes",
+      "item": [
+        {
+          "name": "Reporte Completo de Cliente",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/reports/customer/CUST001",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "customer",
+                "CUST001"
+              ]
+            },
+            "description": "## Reporte Completo de Cliente\n\nObtiene un reporte detallado del cliente con:\n- ✅ Código del cliente\n- ✅ Fecha de generación del reporte\n- ✅ **Todas las cuentas del cliente**\n- ✅ **Todos los movimientos de cada cuenta** (historial completo)\n- ✅ Saldos inicial y actual de cada cuenta\n- ✅ Estado de cada cuenta (activa/inactiva)\n\n### Sin filtro de fechas\nEste endpoint devuelve el **historial completo** de todas las transacciones.\n\n### Información incluida por cuenta\n- Número de cuenta\n- Tipo de cuenta (AHORRO/CORRIENTE)\n- Saldo inicial\n- Saldo actual\n- Estado (activa/inactiva)\n- Lista completa de movimientos:\n  - Fecha de movimiento\n  - Tipo (DEPOSITO/RETIRO)\n  - Monto\n  - Saldo después del movimiento\n  - Descripción"
+          },
+          "response": []
+        },
+        {
+          "name": "Estado de Cuenta por Período",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{authToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{accountServiceURL}}/api/v1/reports/CUST001?startDate=2022-02-01&endDate=2022-02-28",
+              "host": [
+                "{{accountServiceURL}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "CUST001"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2022-02-01",
+                  "description": "Fecha de inicio (YYYY-MM-DD)"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2022-02-28",
+                  "description": "Fecha de fin (YYYY-MM-DD)"
+                }
+              ]
+            },
+            "description": "## Estado de Cuenta de Cliente (F4)\n\nGenera un reporte completo con todas las cuentas y movimientos de un cliente **en un rango de fechas específico**.\n\n### Parámetros\n- `customerCode`: Código del cliente (en la ruta)\n- `startDate`: Fecha de inicio (query param, formato: YYYY-MM-DD)\n- `endDate`: Fecha de fin (query param, formato: YYYY-MM-DD)\n\n### Respuesta\nIncluye:\n- Información del cliente\n- Todas las cuentas del cliente\n- **Movimientos filtrados** por el período especificado\n- Saldos inicial y final de cada cuenta"
+          },
+          "response": []
+        }
+      ],
+      "description": "## 📈 Reportes\n\nGeneración de reportes y estados de cuenta para clientes.\n\n### Endpoints Disponibles\n\n#### 1. Reporte Completo (Sin fechas)\n`GET /api/v1/reports/customer/{customerCode}`\n- ✅ Historial completo del cliente\n- ✅ Todas las cuentas\n- ✅ Todos los movimientos (sin filtro)\n- ✅ Estado actual de las cuentas\n\n#### 2. Estado de Cuenta por Período (F4)\n`GET /api/v1/reports/{customerCode}?startDate=X&endDate=Y`\n- ✅ Movimientos filtrados por fechas\n- ✅ Todas las cuentas del cliente\n- ✅ Solo movimientos del período\n\n### Características\n- 📊 Información detallada por cuenta\n- 💰 Saldos y movimientos completos\n- 📋 Formato estructurado para reportes"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Debug: Verificar variables disponibles",
+          "const envToken = pm.environment.get('authToken');",
+          "const globalToken = pm.globals.get('authToken');",
+          "const token = envToken || globalToken;",
+          "",
+          "if (token) {",
+          "    console.log('🔑 Token encontrado (primeros 50 chars):', token.substring(0, 50) + '...');",
+          "    ",
+          "    // Mostrar información del usuario si está disponible",
+          "    const customerCode = pm.environment.get('currentCustomerCode') || pm.globals.get('currentCustomerCode');",
+          "    const userName = pm.environment.get('currentUserName') || pm.globals.get('currentUserName');",
+          "    if (customerCode) console.log('👤 Customer Code:', customerCode);",
+          "    if (userName) console.log('📝 Usuario:', userName);",
+          "} else {",
+          "    console.log('⚠️ No se encontró token. Ejecuta Login primero.');",
+          "}",
+          "",
+          "// Verificar expiración del token (ahora con 5 minutos)",
+          "const tokenExpiration = pm.environment.get('tokenExpiration') || pm.globals.get('tokenExpiration');",
+          "if (tokenExpiration) {",
+          "    const expirationDate = new Date(tokenExpiration);",
+          "    const now = new Date();",
+          "    const secondsUntilExpiration = (expirationDate - now) / 1000;",
+          "    ",
+          "    if (secondsUntilExpiration <= 0) {",
+          "        console.log('❌ Token EXPIRADO. Ejecuta Login nuevamente.');",
+          "    } else if (secondsUntilExpiration < 60) {",
+          "        console.log('⚠️ Token expira en', Math.round(secondsUntilExpiration), 'segundos. Considera renovar.');",
+          "    } else {",
+          "        const minutesLeft = Math.round(secondsUntilExpiration / 60);",
+          "        console.log('⏰ Token válido por', minutesLeft, 'minuto(s) más.');",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "authServiceURL",
+      "value": "http://localhost:8080",
+      "type": "default",
+      "description": "🔐 Auth Service - Autenticación JWT"
+    },
+    {
+      "key": "customerServiceURL",
+      "value": "http://localhost:8081",
+      "type": "default",
+      "description": "👥 Customer Service - Gestión de clientes"
+    },
+    {
+      "key": "accountServiceURL",
+      "value": "http://localhost:8082",
+      "type": "default",
+      "description": "💰 Account Service - Cuentas y movimientos"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "🔑 JWT Token - Se guarda automáticamente tras Login exitoso (campo accessToken del server)"
+    },
+    {
+      "key": "tokenExpiration",
+      "value": "",
+      "type": "string",
+      "description": "⏰ Fecha/hora de expiración del token JWT (configurado: 5 minutos)"
+    },
+    {
+      "key": "currentCustomerCode",
+      "value": "",
+      "type": "string",
+      "description": "👤 Customer Code del usuario logueado (útil para queries)"
+    },
+    {
+      "key": "currentUserName",
+      "value": "",
+      "type": "string",
+      "description": "📝 Nombre del usuario actual"
+    },
+    {
+      "key": "userRoles",
+      "value": "",
+      "type": "string",
+      "description": "🎭 Roles del usuario (JSON array como string)"
+    }
+  ]
+}

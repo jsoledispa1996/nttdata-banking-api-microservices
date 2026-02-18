@@ -1,0 +1,153 @@
+services:
+  # MySQL Database for Customer and Account Services
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-nttdata-banking
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-accountdb}
+      MYSQL_USER: ${MYSQL_USER:-banking}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bankingpass}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./BaseDatos/customerdb.sql:/docker-entrypoint-initdb.d/01-customerdb.sql
+      - ./BaseDatos/accountdb.sql:/docker-entrypoint-initdb.d/02-accountdb.sql
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+      
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - banking-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+
+  # Auth Service - OAuth2 Authorization Server
+  nttdata-auth-service:
+    build:
+      context: ./nttdata-banking-microservices
+      dockerfile: nttdata-auth-service/Dockerfile
+    container_name: nttdata-auth-service
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JWT_SECRET: ${JWT_SECRET:-nttdata-banking-microservices-secret-key-2024-super-secure-min-256-bits-hmac-sha256}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-300} # 5 minutes in seconds
+    networks:
+      - banking-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Customer Service
+  nttdata-customer-service:
+    build:
+      context: ./nttdata-banking-microservices
+      dockerfile: nttdata-customer-service/Dockerfile
+    container_name: nttdata-customer-service
+    depends_on:
+      nttdata-auth-service:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_R2DBC_URL: r2dbc:mysql://mysql:3306/customerdb
+      SPRING_R2DBC_USERNAME: ${MYSQL_USER:-banking}
+      SPRING_R2DBC_PASSWORD: ${MYSQL_PASSWORD:-bankingpass}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-nttdata-banking-microservices-secret-key-2024-super-secure-min-256-bits-hmac-sha256}
+    networks:
+      - banking-network
+    restart: unless-stopped
+
+  # Account Service
+  nttdata-account-service:
+    build:
+      context: ./nttdata-banking-microservices
+      dockerfile: nttdata-account-service/Dockerfile
+    container_name: nttdata-account-service
+    depends_on:
+      nttdata-auth-service:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_R2DBC_URL: r2dbc:mysql://mysql:3306/accountdb
+      SPRING_R2DBC_USERNAME: ${MYSQL_USER:-banking_user}
+      SPRING_R2DBC_PASSWORD: ${MYSQL_PASSWORD:-banking_pass}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-nttdata-banking-microservices-secret-key-2024-super-secure-min-256-bits-hmac-sha256}
+    networks:
+      - banking-network
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+    driver: local
+
+networks:
+  banking-network:
+    driver: bridge

@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: nttdata-auth-service
+  
+  profiles:
+    active: dev
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:nttdata-banking-microservices-secret-key-2024-super-secure-min-256-bits-hmac-sha256}
+  expiration: ${JWT_EXPIRATION:300} # 5 minutes in seconds
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.nttdata.banking.auth: DEBUG
+    org.springframework.security: DEBUG

@@ -1,0 +1,36 @@
+spring:
+  r2dbc:
+    url: r2dbc:mysql://localhost:3307/customerdb?useSSL=false
+    username: banking_user
+    password: banking_pass
+    pool:
+      initial-size: 10
+      max-size: 50
+      max-idle-time: 30m
+      validation-query: SELECT 1
+
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+    properties:
+      spring.json.add.type.headers: false
+
+server:
+  port: 8081
+
+logging:
+  level:
+    com.nttdata.banking: DEBUG
+    org.springframework.r2dbc: DEBUG
+    io.r2dbc.mysql: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+# Kafka Topics
+kafka:
+  topics:
+    customer-events: customer-events

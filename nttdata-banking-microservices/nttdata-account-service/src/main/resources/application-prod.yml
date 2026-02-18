@@ -1,0 +1,37 @@
+spring:
+  r2dbc:
+    url: ${SPRING_R2DBC_URL:r2dbc:mysql://mysql:3306/accountdb}
+    username: ${SPRING_R2DBC_USERNAME:banking_user}
+    password: ${SPRING_R2DBC_PASSWORD:banking_pass}
+    pool:
+      initial-size: 20
+      max-size: 100
+      max-idle-time: 30m
+      validation-query: SELECT 1
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: account-service-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.type.mapping: "CustomerCreatedEvent:com.nttdata.banking.shared.events.CustomerCreatedEvent,CustomerUpdatedEvent:com.nttdata.banking.shared.events.CustomerUpdatedEvent,CustomerDeletedEvent:com.nttdata.banking.shared.events.CustomerDeletedEvent"
+
+server:
+  port: 8082
+
+logging:
+  level:
+    com.nttdata.banking: INFO
+    org.springframework.r2dbc: WARN
+    org.springframework.kafka: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+# Kafka Topics
+kafka:
+  topics:
+    customer-events: customer-events
